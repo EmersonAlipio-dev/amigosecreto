@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { supabase, uploadAvatar } from '@/lib/supabase';
 
+export const instant = false;
+
 // No Next.js 15+, os params chegam como uma Promise nos Client Components
 export default function RoomPage() {
   const params = useParams(); // <-- Usar o hook
