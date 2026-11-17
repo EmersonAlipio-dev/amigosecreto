@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -18,11 +18,8 @@ import {
 } from 'lucide-react';
 import { supabase, uploadAvatar } from '@/lib/supabase';
 
-export const instant = false;
-
-// No Next.js 15+, os params chegam como uma Promise nos Client Components
-export default function RoomPage() {
-  const params = useParams(); // <-- Usar o hook
+function RoomContent() {
+  const params = useParams();
   const code = params?.code as string;
 
   const [room, setRoom] = useState<any>(null);
@@ -54,6 +51,8 @@ export default function RoomPage() {
   const [drawing, setDrawing] = useState(false);
 
   useEffect(() => {
+    if (!code) return;
+
     if (localStorage.getItem(`host_${code}`) === 'true') {
       setIsHost(true);
     }
@@ -82,6 +81,7 @@ export default function RoomPage() {
   }, [code]);
 
   async function loadRoomData() {
+    if (!code) return;
     const { data: roomData } = await supabase
       .from('rooms')
       .select('*')
@@ -108,7 +108,6 @@ export default function RoomPage() {
     setPhone(formatted);
   }
 
-  // Função de envio do código 100% protegida contra erros de JSON
   async function handleSendOtp() {
     if (phone.replace(/\D/g, '').length < 10) {
       alert('Digite um número de telefone válido com DDD!');
@@ -123,18 +122,17 @@ export default function RoomPage() {
         body: JSON.stringify({ phone }),
       });
 
-      // Lemos o texto bruto primeiro
       const text = await res.text();
       let data;
       
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error('A API do Telegram não respondeu corretamente. Verifica se o Token está correto no .env.local.');
+        throw new Error('A API do Telegram não respondeu corretamente. Verifica o Token no ficheiro .env.local.');
       }
 
       if (!res.ok) {
-        alert(data.error || 'Erro ao enviar código. Iniciaste a conversa com o bot no Telegram?');
+        alert(data.error || 'Erro ao enviar código. Já iniciaste a conversa com o bot no Telegram?');
         return;
       }
       
@@ -247,7 +245,7 @@ export default function RoomPage() {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Resposta não-JSON da API de Sorteio:", text);
-        throw new Error('O servidor respondeu com um erro inesperado (Verifique o terminal do VS Code).');
+        throw new Error('O servidor respondeu com um erro inesperado.');
       }
 
       if (!res.ok) {
@@ -267,7 +265,7 @@ export default function RoomPage() {
   if (!room) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
-        Carregando sala...
+        A carregar sala...
       </div>
     );
   }
@@ -303,7 +301,7 @@ export default function RoomPage() {
               onSubmit={handleNextToGifts}
               className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 space-y-5 shadow-2xl"
             >
-              <h3 className="text-xl font-bold">1. Seu Perfil no Sorteio</h3>
+              <h3 className="text-xl font-bold">1. O seu Perfil no Sorteio</h3>
 
               <div className="flex flex-col items-center">
                 <label className="relative cursor-pointer group">
@@ -327,12 +325,12 @@ export default function RoomPage() {
                     }}
                   />
                 </label>
-                <span className="text-xs text-zinc-400 mt-2">Toque para enviar sua foto</span>
+                <span className="text-xs text-zinc-400 mt-2">Toque para enviar a sua foto</span>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <label className="text-xs text-zinc-400">Seu Nome</label>
+                  <label className="text-xs text-zinc-400">O seu Nome</label>
                   <input
                     type="text"
                     required
@@ -358,7 +356,7 @@ export default function RoomPage() {
               <div className="space-y-3 pt-2 border-t border-zinc-800">
                 <label className="text-xs text-zinc-400 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-purple-400" />
-                  Celular (Verificação Telegram)
+                  Telemóvel (Verificação Telegram)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -376,7 +374,7 @@ export default function RoomPage() {
                       disabled={loadingOtp || phone.length < 14}
                       className="bg-purple-600 hover:bg-purple-500 px-4 rounded-xl text-xs font-semibold transition disabled:opacity-50"
                     >
-                      {loadingOtp ? 'Enviando...' : otpSent ? 'Reenviar' : 'Verificar'}
+                      {loadingOtp ? 'A enviar...' : otpSent ? 'Reenviar' : 'Verificar'}
                     </button>
                   )}
                 </div>
@@ -582,5 +580,18 @@ export default function RoomPage() {
         </AnimatePresence>
       </div>
     </main>
+  );
+}
+
+// O export default principal que envolve a página no Suspense para a Vercel
+export default function RoomPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        A preparar a sala...
+      </div>
+    }>
+      <RoomContent />
+    </Suspense>
   );
 }
